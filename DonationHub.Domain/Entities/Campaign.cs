@@ -11,10 +11,10 @@ public class Campaign: AuditableEntity, ISoftDeletable
     public DateTime EndDate {get; private set;}
     public CampaignStatus Status {get; private set;}
 
-    public string TitleAr { get; private set; }
-    public string TitleEn { get; private set; }
-    public string DescriptionAr { get; private set; }
-    public string DescriptionEn { get; private set; }
+    public string TitleAr { get; private set; } = null!;
+    public string TitleEn { get; private set; } = null!;
+    public string DescriptionAr { get; private set; } = null!;
+    public string DescriptionEn { get; private set; } = null!;
     public Guid CategoryId { get; private set; }
     public Guid CreatedByUserId { get; private set; }
 
