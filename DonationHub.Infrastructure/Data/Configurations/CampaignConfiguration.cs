@@ -39,7 +39,7 @@ public class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
 
         builder.Property(c => c.Status)
             .HasConversion<string>()
-            .IsRequired();
+            .HasMaxLength(20);
             
         builder.Property(c => c.BannerFileName)
             .HasMaxLength(CampaignConstants.MaxBannerFileNameLength);
