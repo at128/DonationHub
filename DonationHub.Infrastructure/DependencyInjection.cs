@@ -64,7 +64,7 @@ public static class DependencyInjection
             .Validate(options =>
                     !string.IsNullOrWhiteSpace(options.Issuer) &&
                     !string.IsNullOrWhiteSpace(options.Audience) &&
-                    Encoding.UTF8.GetByteCount(options.SigningKey) >= 32,
+                    IsValidSigningKey(options.SigningKey),
                 "Invalid JWT configuration.")
             .Validate(
                 options =>
@@ -115,5 +115,19 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         return services;
+    }
+    private static bool IsValidSigningKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return false;
+
+        try
+        {
+            return Convert.FromBase64String(key).Length >= 32;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }
