@@ -19,6 +19,7 @@ public class Campaign: AuditableEntity, ISoftDeletable
     public Guid CreatedByUserId { get; private set; }
 
     public bool IsDeleted {get; private set;}
+    public DateTime? DeletedAtUtc { get; private set; }
     public string? BannerFileName { get; private set; }
     public byte[]? RowVersion { get; private set; }
 

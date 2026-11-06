@@ -1,5 +1,8 @@
-
+using DonationHub.Application.Abstractions.Persistence;
+using DonationHub.Domain.Entities;
+using DonationHub.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -7,82 +10,62 @@ namespace DonationHub.Infrastructure.Identity;
 
 public static class IdentitySeeder
 {
-    public static async Task SeedAsync(
-        IServiceProvider serviceProvider)
+    public static async Task SeedAsync(IServiceProvider serviceProvider, bool development = false)
     {
         using var scope = serviceProvider.CreateScope();
+        var services = scope.ServiceProvider;
+        var roles = services.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+        var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var db = services.GetRequiredService<AppDbContext>();
+        var store = services.GetRequiredService<AppUserStore>();
+        var unitOfWork = services.GetRequiredService<IUnitOfWork>();
+        var now = services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+        var admin = services.GetRequiredService<IOptions<SeedAdminOptions>>().Value;
+        foreach (var role in new[] { "Admin", "CampaignManager", "Donor" })
+            if (!await roles.RoleExistsAsync(role)) Ensure(await roles.CreateAsync(new IdentityRole<Guid>(role)));
+        await SeedUser(admin.Email, admin.Password, "System Administrator", "Admin");
+        if (!development) return;
 
-        var roleManager = scope.ServiceProvider
-            .GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-
-        string[] roles =
-        [
-            "Admin",
-            "CampaignManager",
-            "Donor"
-        ];
-
-        foreach (var role in roles)
+        var demo = services.GetRequiredService<IOptions<DevelopmentSeedOptions>>().Value;
+        await SeedUser(demo.ManagerEmail, demo.ManagerPassword, "Demo Campaign Manager", "CampaignManager");
+        await SeedUser(demo.DonorEmail, demo.DonorPassword, "Demo Donor", "Donor");
+        var repository = services.GetRequiredService<IGenericRepository<Category>>();
+        foreach (var (ar, en) in new[] { ("الصحة", "Health"), ("التعليم", "Education"), ("الإغاثة", "Relief"), ("الأيتام", "Orphans"), ("البيئة", "Environment") })
         {
-            if (await roleManager.RoleExistsAsync(role))
-                continue;
-
-            var result = await roleManager.CreateAsync(
-                new IdentityRole<Guid>(role));
-
-            if (!result.Succeeded)
-            {
-                var errors = string.Join(
-                    ", ",
-                    result.Errors.Select(e => e.Description));
-
-                throw new InvalidOperationException(
-                    $"Failed to seed role '{role}': {errors}");
-            }
+            if (!await db.Categories.AsNoTracking().AnyAsync(c => c.NameAr == ar || c.NameEn == en))
+                await repository.AddAsync(Category.Create(ar, en, ar, en));
         }
+        await unitOfWork.SaveChangesAsync();
 
-        var userManager = scope.ServiceProvider
-            .GetRequiredService<UserManager<ApplicationUser>>();
-
-        var adminSeedOptions = scope.ServiceProvider
-            .GetRequiredService<IOptions<AdminSeedOptions>>()
-            .Value;
-        
-        var adminUser = await userManager.FindByEmailAsync(adminSeedOptions.Email);
-
-        if(adminUser is null)
+        async Task SeedUser(string email, string password, string name, string role)
         {
-            adminUser = new ApplicationUser
+            email = email.Trim();
+            var existing = await users.FindByEmailAsync(email);
+            if (existing is not null)
             {
-                Id=Guid.CreateVersion7(),
-                UserName = adminSeedOptions.Email,
-                Email = adminSeedOptions.Email,
-                EmailConfirmed = true,
-                FullName = "System Administrator",
-                PreferredLanguage = "en",
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
+                if (!await users.IsInRoleAsync(existing, role))
+                    throw new InvalidOperationException("A seed email belongs to an existing account with a different role.");
+                return;
+            }
+            var user = new ApplicationUser
+            {
+                Id = Guid.CreateVersion7(), UserName = email, Email = email, EmailConfirmed = true,
+                FullName = name, PreferredLanguage = "en", IsActive = true, CreatedAt = now
             };
-            var result = await userManager.CreateAsync(adminUser, adminSeedOptions.Password);
-
-            if (!result.Succeeded)
+            var autoSave = store.AutoSaveChanges;
+            store.AutoSaveChanges = false;
+            try
             {
-                throw new InvalidOperationException(
-                    string.Join(", ", result.Errors.Select(e => e.Description)));
+                Ensure(await users.CreateAsync(user, password));
+                Ensure(await users.AddToRoleAsync(user, role));
+                await unitOfWork.SaveChangesAsync();
             }
-
-            result = await userManager.AddToRoleAsync(adminUser,"Admin");
-
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    string.Join(", ", result.Errors.Select(e => e.Description)));
-            }
-
-        }else if (!await userManager.IsInRoleAsync(adminUser, "Admin"))
-        {
-            throw new InvalidOperationException(
-                "Admin seed email already belongs to a non-admin user.");
+            finally { store.AutoSaveChanges = autoSave; }
         }
+    }
+
+    private static void Ensure(IdentityResult result)
+    {
+        if (!result.Succeeded) throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
     }
 }

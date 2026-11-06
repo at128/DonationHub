@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace DonationHub.Infrastructure.Data.Interceptors;
 
-public class AuditingInterceptor : SaveChangesInterceptor
+public class AuditingInterceptor(TimeProvider clock) : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
@@ -25,12 +25,12 @@ public class AuditingInterceptor : SaveChangesInterceptor
             eventData, result, cancellationToken);
     }
 
-    private static void ApplyChanges(DbContext? context)
+    private void ApplyChanges(DbContext? context)
     {
         if (context is null)
             return;
 
-        var now = DateTime.UtcNow;
+        var now = clock.GetUtcNow().UtcDateTime;
 
         // Convert hard delete to soft delete
         foreach (var entry in context.ChangeTracker
@@ -43,6 +43,8 @@ public class AuditingInterceptor : SaveChangesInterceptor
 
             entry.Property(nameof(ISoftDeletable.IsDeleted))
                 .CurrentValue = true;
+            entry.Property(nameof(ISoftDeletable.DeletedAtUtc))
+                .CurrentValue = entry.Entity.DeletedAtUtc ?? now;
         }
 
         // Set audit timestamps
@@ -59,6 +61,7 @@ public class AuditingInterceptor : SaveChangesInterceptor
             }
             else if (entry.State == EntityState.Modified)
             {
+                entry.Property(nameof(AuditableEntity.CreatedAt)).IsModified = false;
                 entry.Property(nameof(AuditableEntity.UpdatedAt))
                     .CurrentValue = now;
             }

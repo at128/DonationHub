@@ -16,7 +16,7 @@ public interface ICategoryQueries
 }
 
 public sealed class CategoryService(
-    IRepository<Category> categories, ICategoryQueries queries, IUnitOfWork unitOfWork)
+    IGenericRepository<Category> categories, ICategoryQueries queries, IUnitOfWork unitOfWork)
 {
     public Task<IReadOnlyList<CategoryResponse>> GetAllAsync(CancellationToken ct) => queries.GetAllAsync(ct);
     public Task<CategoryResponse?> GetByIdAsync(Guid id, CancellationToken ct) => queries.GetByIdAsync(id, ct);

@@ -5,11 +5,12 @@ using DonationHub.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplicationServices();
-builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddInfrastructureServices(builder.Configuration, builder.Environment.IsDevelopment());
 
 
 builder.Services.AddOpenApi(options =>
@@ -71,7 +72,8 @@ if (app.Environment.IsDevelopment())
                .AddPreferredSecuritySchemes("Bearer"));
 }
 
-await IdentitySeeder.SeedAsync(app.Services);
+app.Services.GetRequiredService<IStartupValidator>().Validate();
+await IdentitySeeder.SeedAsync(app.Services, app.Environment.IsDevelopment());
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -82,3 +84,5 @@ app.MapCategoriesEndpoints();
 app.MapGet("/", () => "Hello World!");
 
 app.Run();
+
+public partial class Program;

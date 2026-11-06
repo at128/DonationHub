@@ -1,5 +1,6 @@
 using DonationHub.Domain.Constants;
 using DonationHub.Domain.Entities;
+using DonationHub.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -55,9 +56,18 @@ public class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
 
         builder.HasQueryFilter(c => !c.IsDeleted);
 
+        builder.Property(c => c.DeletedAtUtc).HasConversion(
+            value => value,
+            value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : value);
+
          builder.HasOne<Category>()
             .WithMany()
             .HasForeignKey(c => c.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(c => c.CreatedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

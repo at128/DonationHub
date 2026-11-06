@@ -26,6 +26,8 @@ public class RefreshTokenConfiguration
         builder.Property(x => x.ExpiresAt)
             .IsRequired();
 
+        builder.Property(x => x.RevokedAt).IsConcurrencyToken();
+
         builder.HasOne<ApplicationUser>()
             .WithMany()
             .HasForeignKey(x => x.UserId)

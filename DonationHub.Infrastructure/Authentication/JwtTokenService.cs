@@ -5,16 +5,19 @@ using System.Text;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
+using DonationHub.Application.Options;
 
 namespace DonationHub.Infrastructure.Authentication;
 
 public class JwtTokenService : ITokenService
 {
     private readonly JwtOptions _options;
+    private readonly TimeProvider _clock;
 
-    public JwtTokenService(IOptions<JwtOptions> options)
+    public JwtTokenService(IOptions<JwtOptions> options, TimeProvider clock)
     {
         _options=options.Value;
+        _clock = clock;
     }
 
     public string CreateAccessToken(Guid userId, string email, IEnumerable<string> roles)
@@ -33,7 +36,7 @@ public class JwtTokenService : ITokenService
 
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var now = DateTime.UtcNow;
+        var now = _clock.GetUtcNow().UtcDateTime;
 
         var jwtToken = new JwtSecurityToken(
             issuer: _options.Issuer,

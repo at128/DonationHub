@@ -1,5 +1,6 @@
 using DonationHub.Application.Abstractions.Persistence;
 using DonationHub.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace DonationHub.Infrastructure.Persistence;
 
@@ -12,9 +13,10 @@ public sealed class EfUnitOfWork : IUnitOfWork
         _context = context;
     }
 
-    public Task<int> SaveChangesAsync(
+    public async Task<int> SaveChangesAsync(
         CancellationToken ct = default)
     {
-        return _context.SaveChangesAsync(ct);
+        try { return await _context.SaveChangesAsync(ct); }
+        catch (DbUpdateConcurrencyException ex) { throw new PersistenceConcurrencyException(ex); }
     }
 }

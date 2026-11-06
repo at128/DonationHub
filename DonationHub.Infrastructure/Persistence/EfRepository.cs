@@ -20,8 +20,7 @@ public sealed class EfRepository<TEntity>
         Guid id,
         CancellationToken ct = default)
     {
-        return await _dbSet.FindAsync(
-            new object[] { id }, ct);
+        return await _dbSet.SingleOrDefaultAsync(entity => entity.Id == id, ct);
     }
 
     public IQueryable<TEntity> Query()
