@@ -31,29 +31,33 @@ public static class AuthEndpoints
         return group;
     }
 
-    private static async Task<IResult> Register(RegisterRequest request,UserManager<ApplicationUser> userManager)
+    private static Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> userManager)
+        => CreateAccount(request.Email, request.Password, request.FullName,
+            request.PreferredLanguage, "Donor", userManager);
+
+    private static async Task<IResult> CreateAccount(string email, string password, string fullName,
+        string preferredLanguage, string role, UserManager<ApplicationUser> userManager)
     {
-        if(string.IsNullOrWhiteSpace(request.FullName) ||
-            request.FullName.Trim().Length > 150 ||
-            request.PreferredLanguage is not ("ar" or "en"))
+        if (string.IsNullOrWhiteSpace(fullName) ||
+            fullName.Trim().Length > 150 ||
+            preferredLanguage is not ("ar" or "en"))
         {
             return Results.BadRequest(
                 new { error = "Invalid profile information." });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Email) ||
-            string.IsNullOrWhiteSpace(request.Password))
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
             return Results.BadRequest(
                 new { error = "Email and password are required." });
         }
 
-        var email = request.Email.Trim();
+        email = email.Trim();
 
         if (await userManager.FindByEmailAsync(email) is not null)
         {
             return Results.Conflict(
-                new { error = "Email is already registered." });
+                new { code = "Auth.EmailAlreadyExists", error = "Email is already registered." });
         }
 
         var user = new ApplicationUser
@@ -61,14 +65,14 @@ public static class AuthEndpoints
             Id = Guid.CreateVersion7(),
             UserName = email,
             Email = email,
-            FullName = request.FullName.Trim(),
-            PreferredLanguage = request.PreferredLanguage,
+            FullName = fullName.Trim(),
+            PreferredLanguage = preferredLanguage,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
 
         var result = await userManager.CreateAsync(
-            user, request.Password);
+            user, password);
 
         if (!result.Succeeded)
         {
@@ -76,7 +80,7 @@ public static class AuthEndpoints
                 result.Errors.Select(e => e.Description));
         }
 
-        result = await userManager.AddToRoleAsync(user, "Donor");
+        result = await userManager.AddToRoleAsync(user, role);
 
         if (!result.Succeeded)
         {
@@ -84,8 +88,12 @@ public static class AuthEndpoints
             await userManager.DeleteAsync(user);
 
             return Results.Problem(
-                "Failed to assign the Donor role.");
+                "Failed to assign the account role.");
         }
+
+        if (role != "Donor")
+            return Results.Json(new { user.Id, user.Email, user.FullName, Role = role },
+                statusCode: StatusCodes.Status201Created);
 
         return Results.Json(
             new { user.Id, user.Email, user.FullName },
@@ -290,73 +298,15 @@ private static async Task<IResult> Logout(
     public sealed record LogoutRequest(string RefreshToken);
 
 
-private static async Task<IResult> CreateStaff(
+    private static Task<IResult> CreateStaff(
     CreateStaffRequest request,
     UserManager<ApplicationUser> userManager)
     {
         if (request.Role is not ("Admin" or "CampaignManager"))
-            return Results.BadRequest(
-                new { error = "Invalid staff role." });
+            return Task.FromResult<IResult>(Results.BadRequest(new { error = "Invalid staff role." }));
 
-        if (string.IsNullOrWhiteSpace(request.FullName) ||
-            request.FullName.Trim().Length > 150 ||
-            request.PreferredLanguage is not ("ar" or "en"))
-        {
-            return Results.BadRequest(
-                new { error = "Invalid profile information." });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Email) ||
-            string.IsNullOrWhiteSpace(request.TemporaryPassword))
-        {
-            return Results.BadRequest(
-                new { error = "Email and password are required." });
-        }
-
-        var email = request.Email.Trim();
-
-        if (await userManager.FindByEmailAsync(email) is not null)
-            return Results.Conflict(
-                new { error = "Email is already registered." });
-
-        var user = new ApplicationUser
-        {
-            Id = Guid.CreateVersion7(),
-            UserName = email,
-            Email = email,
-            FullName = request.FullName.Trim(),
-            PreferredLanguage = request.PreferredLanguage,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        var result = await userManager.CreateAsync(
-            user, request.TemporaryPassword);
-
-        if (!result.Succeeded)
-            return Results.BadRequest(
-                result.Errors.Select(e => e.Description));
-
-        result = await userManager.AddToRoleAsync(
-            user, request.Role);
-
-        if (!result.Succeeded)
-        {
-            await userManager.DeleteAsync(user);
-
-            return Results.Problem(
-                "Failed to assign the staff role.");
-        }
-
-        return Results.Json(
-            new
-            {
-                user.Id,
-                user.Email,
-                user.FullName,
-                Role = request.Role
-            },
-            statusCode: StatusCodes.Status201Created);
+        return CreateAccount(request.Email, request.TemporaryPassword, request.FullName,
+            request.PreferredLanguage, request.Role, userManager);
     }
 
 }

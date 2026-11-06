@@ -51,6 +51,12 @@ public class Category : AuditableEntity
         DescriptionEn = descriptionEn;
     }
 
+    public void EnsureCanBeDeleted(bool hasCampaigns)
+    {
+        if (hasCampaigns)
+            throw new InvalidOperationException("Cannot delete a category with campaigns.");
+    }
+
     private static string ValidateName(string name)
     {
         if (string.IsNullOrWhiteSpace(name))

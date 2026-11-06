@@ -7,6 +7,7 @@ using DonationHub.Infrastructure.Data;
 using DonationHub.Infrastructure.Data.Interceptors;
 using DonationHub.Infrastructure.Identity;
 using DonationHub.Infrastructure.Persistence;
+using DonationHub.Application.Features.Categories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -113,6 +114,7 @@ public static class DependencyInjection
             typeof(EfRepository<>));
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<ICategoryQueries, CategoryQueries>();
 
         return services;
     }
