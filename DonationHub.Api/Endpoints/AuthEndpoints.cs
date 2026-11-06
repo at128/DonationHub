@@ -19,6 +19,10 @@ public static class AuthEndpoints
         var group = app.MapGroup("api/v1/auth")
                         .WithTags("Authentication");
 
+        app.MapPost("/api/v1/admin/staff", CreateStaff)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithTags("Admin");
+
         group.MapPost("/register",Register);
         group.MapPost("/login",Login);
         group.MapGet("/me",Me).RequireAuthorization();
@@ -284,6 +288,77 @@ private static async Task<IResult> Logout(
     public sealed record RefreshRequest(string RefreshToken);
 
     public sealed record LogoutRequest(string RefreshToken);
+
+
+private static async Task<IResult> CreateStaff(
+    CreateStaffRequest request,
+    UserManager<ApplicationUser> userManager)
+    {
+        if (request.Role is not ("Admin" or "CampaignManager"))
+            return Results.BadRequest(
+                new { error = "Invalid staff role." });
+
+        if (string.IsNullOrWhiteSpace(request.FullName) ||
+            request.FullName.Trim().Length > 150 ||
+            request.PreferredLanguage is not ("ar" or "en"))
+        {
+            return Results.BadRequest(
+                new { error = "Invalid profile information." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.TemporaryPassword))
+        {
+            return Results.BadRequest(
+                new { error = "Email and password are required." });
+        }
+
+        var email = request.Email.Trim();
+
+        if (await userManager.FindByEmailAsync(email) is not null)
+            return Results.Conflict(
+                new { error = "Email is already registered." });
+
+        var user = new ApplicationUser
+        {
+            Id = Guid.CreateVersion7(),
+            UserName = email,
+            Email = email,
+            FullName = request.FullName.Trim(),
+            PreferredLanguage = request.PreferredLanguage,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var result = await userManager.CreateAsync(
+            user, request.TemporaryPassword);
+
+        if (!result.Succeeded)
+            return Results.BadRequest(
+                result.Errors.Select(e => e.Description));
+
+        result = await userManager.AddToRoleAsync(
+            user, request.Role);
+
+        if (!result.Succeeded)
+        {
+            await userManager.DeleteAsync(user);
+
+            return Results.Problem(
+                "Failed to assign the staff role.");
+        }
+
+        return Results.Json(
+            new
+            {
+                user.Id,
+                user.Email,
+                user.FullName,
+                Role = request.Role
+            },
+            statusCode: StatusCodes.Status201Created);
+    }
+
 }
 
 
@@ -299,3 +374,10 @@ public sealed record RegisterRequest(
 public sealed record LoginRequest(
     string Email,
     string Password);
+
+public sealed record CreateStaffRequest(
+    string Email,
+    string TemporaryPassword,
+    string FullName,
+    string PreferredLanguage,
+    string Role);
