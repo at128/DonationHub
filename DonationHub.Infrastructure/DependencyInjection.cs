@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using System.Text;
 using DonationHub.Application.Abstractions.Authentication;
+using DonationHub.Application.Abstractions.Persistence;
 using DonationHub.Infrastructure.Authentication;
 using DonationHub.Infrastructure.Data;
 using DonationHub.Infrastructure.Data.Interceptors;
 using DonationHub.Infrastructure.Identity;
+using DonationHub.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -105,6 +107,12 @@ public static class DependencyInjection
             });
 
         services.AddAuthorization();
+
+        services.AddScoped(
+            typeof(IRepository<>),
+            typeof(EfRepository<>));
+
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         return services;
     }

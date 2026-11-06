@@ -16,6 +16,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAuthEndpoints();
+app.MapCategoriesEndpoints();
 
 app.MapGet("/", () => "Hello World!");
 
