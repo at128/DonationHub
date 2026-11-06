@@ -1,3 +1,4 @@
+using DonationHub.Api.Endpoints;
 using DonationHub.Application;
 using DonationHub.Infrastructure;
 using DonationHub.Infrastructure.Identity;
@@ -10,6 +11,11 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 var app = builder.Build();
 
 await IdentitySeeder.SeedAsync(app.Services);
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapAuthEndpoints();
 
 app.MapGet("/", () => "Hello World!");
 
